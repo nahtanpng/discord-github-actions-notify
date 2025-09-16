@@ -22,7 +22,6 @@ Tudo isso usando **Webhooks do Discord** e **workflows simples em YAML**.
 ---
 
 ## Exemplo: Notificação de Push
-
 ```yaml
 name: Discord Notify (Push)
 
@@ -49,6 +48,9 @@ jobs:
                -d "{\"content\": \"$MESSAGE\"}" \
                ${{ secrets.DISCORD_WEBHOOK }}
 ```
+
+### Demonstração:
+<img width="539" height="143" alt="image" src="https://github.com/user-attachments/assets/b7181372-b5d9-4ae1-824f-6f28e1a0a2cb" />
 
 ## Exemplo: Notificação de Pull Request
 
@@ -79,6 +81,109 @@ jobs:
                ${{ secrets.DISCORD_WEBHOOK }}
 ```
 
-🎯 Objetivo
+### Demonstração:
+<img width="452" height="143" alt="image" src="https://github.com/user-attachments/assets/a8654870-f845-4888-9866-5fe2e95ec3bb" />
 
-O objetivo deste repositório é servir de guia prático para qualquer desenvolvedor que queira melhorar a comunicação do time, recebendo notificações em tempo real no Discord sempre que algo importante acontecer no repositório.
+## Estilizações
+
+Uma forma para estilizar esse aviso é utilizar `embeds` do Discord.
+
+## Exemplo: Notificação de push
+```yml
+name: Notify Discord on branch push
+
+on:
+  push:
+    branches:
+      - main
+      - homolog
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Send Discord notification (with embed + mention)
+      run: |
+        COMMIT_URL="https://github.com/${{ github.repository }}/commit/${{ github.sha }}"
+    
+        jq -n \
+          --arg branch "${{ github.ref_name }}" \
+          --arg author "${{ github.actor }}" \
+          --arg url "$COMMIT_URL" \
+          --arg repo "${{ github.repository }}" \
+          '{
+            content: "@here",
+            embeds: [
+              {
+                title: (":rocket: Push detectado em `" + $repo + "`! Atualizem suas branchs."),
+                description: (":pushpin: **Branch:** `" + $branch + "`\n:pencil: **Autor:** " + $author + "\n:link: [Ver Commit](" + $url + ")"),
+                color: 5814783,
+              }
+            ]
+          }' \
+          | curl -H "Content-Type: application/json" \
+                 -X POST \
+                 -d @- \
+                 ${{ secrets.DISCORD_WEBHOOK }}
+```
+
+### Demonstração:
+<img width="740" height="219" alt="image" src="https://github.com/user-attachments/assets/0deb8ac6-9500-4c9c-8698-1dae2ed946dc" />
+
+## Exemplo: Notificação de Pull Request
+
+```yml
+name: Notify Discord on PR open
+
+on:
+  pull_request:
+    branches:
+      - main
+      - homolog
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Discord notification (PR opened with reviewers)
+        run: |
+          PR_URL="${{ github.event.pull_request.html_url }}"
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          PR_AUTHOR="${{ github.event.pull_request.user.login }}"
+          BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
+          REPO="${{ github.repository }}"
+      
+          # Pega todos os reviewers pedidos
+          REVIEWERS=$(jq -r '.pull_request.requested_reviewers | map(.login) | join(", ")' "$GITHUB_EVENT_PATH")
+          # Se não tiver nenhum, coloca "Nenhum"
+          if [ -z "$REVIEWERS" ]; then
+            REVIEWERS="Nenhum"
+          fi
+      
+          jq -n \
+            --arg branch "$BASE_BRANCH" \
+            --arg author "$PR_AUTHOR" \
+            --arg url "$PR_URL" \
+            --arg title "$PR_TITLE" \
+            --arg repo "$REPO" \
+            --arg reviewers "$REVIEWERS" \
+            '{
+              content: "@here",
+              embeds: [
+                {
+                  title: ("📥 Novo PR aberto em `" + $repo + "` para a branch `" + $branch + "`"),
+                  description: ("📝 **Título:** " + $title + "\n👤 **Autor:** " + $author + "\n👀 **Reviewers:** " + $reviewers + "\n🔗 [Abrir PR](" + $url + ")"),
+                  color: (if $branch == "main" then 3066993 else 15105570 end),
+                  footer: { text: $repo }
+                }
+              ]
+            }' \
+            | curl -H "Content-Type: application/json" \
+                   -X POST \
+                   -d @- \
+                   ${{ secrets.DISCORD_WEBHOOK }}
+```
+
+### Demonstração:
+<img width="656" height="269" alt="image" src="https://github.com/user-attachments/assets/bce21a1c-4860-46db-8ee4-a227cff5a888" />
+

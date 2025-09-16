@@ -1,24 +1,49 @@
-name: Discord Notify (PR)
+name: Notify Discord on PR open
 
 on:
   pull_request:
-    types: [opened]
+    branches:
+      - main
+      - homolog
 
 jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
-      - name: Send Discord Notification
+      - name: Send Discord notification (PR opened with reviewers)
         run: |
           PR_URL="${{ github.event.pull_request.html_url }}"
           PR_TITLE="${{ github.event.pull_request.title }}"
           PR_AUTHOR="${{ github.event.pull_request.user.login }}"
-          BRANCH="${{ github.event.pull_request.base.ref }}"
+          BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
           REPO="${{ github.repository }}"
-
-          MESSAGE="📥 Novo PR aberto em **$REPO**!\n📌 Branch: \`$BRANCH\`\n📝 Título: $PR_TITLE\n👤 Autor: $PR_AUTHOR\n🔗 [Abrir PR]($PR_URL)"
-
-          curl -H "Content-Type: application/json" \
-               -X POST \
-               -d "{\"content\": \"$MESSAGE\"}" \
-               ${{ secrets.DISCORD_WEBHOOK }}
+      
+          # Pega todos os reviewers pedidos
+          REVIEWERS=$(jq -r '.pull_request.requested_reviewers | map(.login) | join(", ")' "$GITHUB_EVENT_PATH")
+          # Se não tiver nenhum, coloca "Nenhum"
+          if [ -z "$REVIEWERS" ]; then
+            REVIEWERS="Nenhum"
+          fi
+      
+          jq -n \
+            --arg branch "$BASE_BRANCH" \
+            --arg author "$PR_AUTHOR" \
+            --arg url "$PR_URL" \
+            --arg title "$PR_TITLE" \
+            --arg repo "$REPO" \
+            --arg reviewers "$REVIEWERS" \
+            '{
+              content: "@here",
+              embeds: [
+                {
+                  title: ("📥 Novo PR aberto em `" + $repo + "` para a branch `" + $branch + "`"),
+                  description: ("📝 **Título:** " + $title + "\n👤 **Autor:** " + $author + "\n👀 **Reviewers:** " + $reviewers + "\n🔗 [Abrir PR](" + $url + ")"),
+                  color: (if $branch == "main" then 3066993 else 15105570 end),
+                  footer: { text: $repo }
+                }
+              ]
+            }' \
+            | curl -H "Content-Type: application/json" \
+                   -X POST \
+                   -d @- \
+                   ${{ secrets.DISCORD_WEBHOOK }}

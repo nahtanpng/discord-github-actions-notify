@@ -1,0 +1,37 @@
+name: Notify Discord on branch push
+
+on:
+  push:
+    branches:
+      - main
+      - homolog
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Send Discord notification (with embed + mention)
+      run: |
+        COMMIT_URL="https://github.com/${{ github.repository }}/commit/${{ github.sha }}"
+    
+        jq -n \
+          --arg branch "${{ github.ref_name }}" \
+          --arg author "${{ github.actor }}" \
+          --arg url "$COMMIT_URL" \
+          --arg repo "${{ github.repository }}" \
+          '{
+            content: "@here",
+            embeds: [
+              {
+                title: ("🚀 Push detectado em `" + $repo + "`! Atualizem suas branchs."),
+                description: ("📌 **Branch:** `" + $branch + "`\n📝 **Autor:** " + $author + "\n🔗 [Ver Commit](" + $url + ")"),
+                color: 5814783,
+              }
+            ]
+          }' \
+          | curl -H "Content-Type: application/json" \
+                 -X POST \
+                 -d @- \
+                 ${{ secrets.DISCORD_WEBHOOK }}
+    
+        

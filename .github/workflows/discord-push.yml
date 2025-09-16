@@ -1,4 +1,4 @@
-name: Discord Notify (Push)
+name: Notify Discord on branch push
 
 on:
   push:
@@ -10,15 +10,26 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
-      - name: Send Discord Notification
-        run: |
-          COMMIT_URL="https://github.com/${{ github.repository }}/commit/${{ github.sha }}"
-          AUTHOR="${{ github.actor }}"
-          BRANCH="${{ github.ref_name }}"
-          REPO="${{ github.repository }}"
-          MESSAGE="🚀 Push detectado em **$REPO**!\n📌 Branch: \`$BRANCH\`\n👤 Autor: $AUTHOR\n🔗 [Ver commit]($COMMIT_URL)"
-
-          curl -H "Content-Type: application/json" \
-               -X POST \
-               -d "{\"content\": \"$MESSAGE\"}" \
-               ${{ secrets.DISCORD_WEBHOOK }}
+    - name: Send Discord notification (with embed + mention)
+      run: |
+        COMMIT_URL="https://github.com/${{ github.repository }}/commit/${{ github.sha }}"
+    
+        jq -n \
+          --arg branch "${{ github.ref_name }}" \
+          --arg author "${{ github.actor }}" \
+          --arg url "$COMMIT_URL" \
+          --arg repo "${{ github.repository }}" \
+          '{
+            content: "@here",
+            embeds: [
+              {
+                title: (":rocket: Push detectado em `" + $repo + "`! Atualizem suas branchs."),
+                description: (":pushpin: **Branch:** `" + $branch + "`\n:pencil: **Autor:** " + $author + "\n:link: [Ver Commit](" + $url + ")"),
+                color: 5814783,
+              }
+            ]
+          }' \
+          | curl -H "Content-Type: application/json" \
+                 -X POST \
+                 -d @- \
+                 ${{ secrets.DISCORD_WEBHOOK }}

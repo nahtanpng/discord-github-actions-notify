@@ -153,10 +153,8 @@ jobs:
           PR_AUTHOR="${{ github.event.pull_request.user.login }}"
           BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
           REPO="${{ github.repository }}"
-      
-          # Get all requested reviewers
           REVIEWERS=$(jq -r '.pull_request.requested_reviewers | map(.login) | join(", ")' "$GITHUB_EVENT_PATH")
-          # If there are none, set to "None"
+
           if [ -z "$REVIEWERS" ]; then
             REVIEWERS="None"
           fi

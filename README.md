@@ -185,3 +185,6 @@ jobs:
 ### Demonstração:
 <img width="656" height="269" alt="image" src="https://github.com/user-attachments/assets/bce21a1c-4860-46db-8ee4-a227cff5a888" />
 
+---
+
+**Feito com ❤️ por [nahtanPNG](https://github.com/nahtanPNG)**

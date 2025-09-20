@@ -1,5 +1,5 @@
 # GitHub Actions + Discord Webhook
-
+ 
 Este repositório mostra como integrar **GitHub Actions** com o **Discord**, enviando notificações automáticas para um canal sempre que eventos importantes acontecem no repositório, como:
 
 - Push nas branches principais (`main`, `homolog`, etc)

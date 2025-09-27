@@ -1,0 +1,106 @@
+name: ci
+
+# This CI is just an node application example, you can use with your own jobs, the important part is just the notify-discord job =)
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  style:
+    name: Style
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Prisma Generate
+        run: npx prisma generate
+
+      - name: Format Check
+        run: npm run format:check
+
+      - name: Check Lint errors
+        run: npm run lint
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build NestJS application
+        run: npm run prod:build
+
+  notify-discord:
+    name: Notify Discord
+    runs-on: ubuntu-latest
+    needs: [style, build]
+    if: ${{ failure() }}
+    steps:
+      - name: Build error message
+        id: message
+        run: |
+          FAILED_JOBS=""
+          if [ "${{ needs.style.result }}" = "failure" ]; then
+            FAILED_JOBS="$FAILED_JOBS Style"
+          fi
+          if [ "${{ needs.build.result }}" = "failure" ]; then
+            FAILED_JOBS="$FAILED_JOBS Build"
+          fi
+          echo "failed_jobs=$FAILED_JOBS" >> $GITHUB_OUTPUT
+  
+      - name: Send Discord notification
+        run: |
+          REPO="${{ github.repository }}"
+          PR_URL="${{ github.event.pull_request.html_url }}"
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          PR_AUTHOR="${{ github.event.pull_request.user.login }}"
+          FAILED_JOBS="${{ steps.message.outputs.failed_jobs }}"
+  
+          jq -n \
+            --arg repo "$REPO" \
+            --arg title "$PR_TITLE" \
+            --arg author "$PR_AUTHOR" \
+            --arg url "$PR_URL" \
+            --arg failed "$FAILED_JOBS" \
+            '{
+              content: "@here",
+              embeds: [
+                {
+                  title: "❌ CI falhou",
+                  description: ("📝 **PR:** " + $title +
+                                "\n👤 **Autor:** " + $author +
+                                "\n📂 **Repo:** " + $repo +
+                                "\n⚠️ **Jobs com erro:** " + $failed +
+                                "\n🔗 [Abrir PR](" + $url + ")"),
+                  color: 15158332,
+                  footer: { text: $repo }
+                }
+              ]
+            }' \
+            | curl -H "Content-Type: application/json" \
+                   -X POST \
+                   -d @- \
+                   ${{ secrets.DISCORD_WEBHOOK }}
